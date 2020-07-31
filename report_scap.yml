@@ -1,0 +1,63 @@
+---
+
+###############################################################################
+#                                                                             #
+# Ansible Hardening lab                                                       #
+# Target: rhel 7/8                                                            #
+# version: 1.0                                                                #
+#                                                                             #
+#                                                                             #
+# Writen by : Diego A. Zarate (PCS_X86 Team)                                  #
+#                                                                             #
+###############################################################################
+
+
+
+
+
+- name: OpenScap Report ITSS Policy
+  hosts: localhost,all
+  gather_facts: true
+  strategy: free
+  become: true
+  vars:
+    data_stream_home: "/usr/share/xml/scap/ssg/content/"
+    oscap_profile7: "xccdf_org.ssgproject.content_profile_pci-dss_customized_DAZ"
+    oscap_profile8: "xccdf_org.ssgproject.content_profile_pci-dss_customized_daz"
+    report_name: "ITSS-HC-Report"
+    report_dest: "/etc/ansible/playbooks/policies/hardening_reports/"
+
+  tasks:
+
+     - name: Run Scap OSCAP RHEL7
+       shell: "oscap xccdf eval --profile {{ oscap_profile7 }} 
+       --report /tmp/{{ inventory_hostname }}-{{ report_name }}.html 
+       --tailoring-file {{ data_stream_home }}ssg-rhel7-ds-tailoring.xml 
+       --fetch-remote-resources {{ data_stream_home }}ssg-rhel7-ds.xml 2>&1"
+       when: ansible_distribution_major_version == "7"
+       ignore_errors: yes
+
+     - name: Run Scap OSCAP RHEL8
+       shell: "oscap xccdf eval --profile {{ oscap_profile8 }}
+       --report /tmp/{{ inventory_hostname }}-{{ report_name }}.html
+       --tailoring-file {{ data_stream_home }}ssg-rhel8-ds-tailoring.xml
+       --fetch-remote-resources {{ data_stream_home }}ssg-rhel8-ds.xml 2>&1"
+       when: ansible_distribution_major_version == "8"
+       ignore_errors: yes
+
+     - name: CP report
+       fetch:
+        src: /tmp/{{ inventory_hostname }}-{{ report_name }}.html
+        dest: "{{ report_dest }}"
+
+        flat: yes
+
+     - name: Clean Report
+       file:
+        path: /tmp/{{ inventory_hostname }}-{{ report_name }}.html
+        state: absent
+
+     - name: send report to box
+       local_action: shell mailx -a {{ report_dest }}{{ inventory_hostname }}-{{ report_name }}.html REDHAT.r556besbztong202@u.box.com < /dev/null
+
+...
